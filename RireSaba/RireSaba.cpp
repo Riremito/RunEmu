@@ -7,6 +7,8 @@
 #pragma comment(lib, "Netapi32.lib")
 #pragma comment(lib, "ws2_32.lib")
 #include<string>
+#include<intrin.h>
+#pragma intrinsic(_ReturnAddress)
 
 // debug
 std::wstring BYTEtoString(BYTE b) {
@@ -45,12 +47,10 @@ std::wstring DWORDtoString(DWORD dw) {
 
 #define DEBUG(msg) \
 {\
-std::wstring wmsg = L"[Maple]";\
+std::wstring wmsg = L"[Debug]";\
 wmsg += msg;\
 OutputDebugStringW(wmsg.c_str());\
 }
-//
-
 
 // CRCBypass
 std::vector<MEMORY_BASIC_INFORMATION> vSection;
@@ -96,6 +96,7 @@ void __declspec(naked) CRCBypass() {
 	}
 }
 
+bool bWindowMode = true;
 bool MemoryPatch() {
 	Rosemary r;
 	r.Backup(vSection, vBackup);
@@ -104,7 +105,7 @@ bool MemoryPatch() {
 		DEBUG(L"vSection = " + DWORDtoString((ULONG_PTR)vSection[i].BaseAddress) + L" - " + DWORDtoString((ULONG_PTR)vSection[i].BaseAddress + vSection[i].RegionSize) + L", Backup = " + DWORDtoString((ULONG_PTR)vBackup[i]));
 	}
 
-	// 0x00B5D2B0 v186
+	// 0x00B5D2B0 v186.1
 	ULONG_PTR uMSCRC = r.Scan(L"8B 4D 18 8B 55 E0 8B 75 08 8B 09 33 0C 96 81 E1 FF 00 00 00 33 04 8D");
 	if (uMSCRC) {
 		uMSCRC += 0x09;
@@ -114,49 +115,49 @@ bool MemoryPatch() {
 	DEBUG(L"uMSCRC = " + DWORDtoString(uMSCRC));
 
 
-	// 0x00BC8D39 v186
+	// 0x00BC8D39 v186.1
 	ULONG_PTR uHackShield_Init =  r.Scan(L"55 8B EC 81 EC ?? ?? ?? ?? 53 8B D9 8D 4B ?? 89 4D ?? E8 ?? ?? ?? ?? 85 C0 0F 85 ?? ?? ?? ?? E8 ?? ?? ?? ?? 85 C0");
 	if (uHackShield_Init) {
 		r.Patch(uHackShield_Init, L"31 C0 C2 04 00");
 	}
 
-	// 0x00BCF256 v186
+	// 0x00BCF256 v186.1
 	ULONG_PTR uEHSvc_Loader_1 = r.Scan(L"55 8B EC 81 EC ?? ?? ?? ?? 57 C7 45 ?? 00 00 00 00 C6 85 ?? ?? ?? ?? 00 B9 ?? ?? ?? ?? 33 C0 8D BD ?? ?? ?? ?? F3 AB");
 	if (uEHSvc_Loader_1) {
 		r.Patch(uEHSvc_Loader_1, L"31 C0 C2 10 03");
 	}
 
-	// 0x00BCE382 v186
+	// 0x00BCE382 v186.1
 	ULONG_PTR uEHSvc_Loader_2 = r.Scan(L"55 8B EC 81 EC ?? ?? ?? ?? 57 C7 45 ?? 00 00 00 00 C7 45 ?? 00 00 00 00 C7 45 ?? 00 00 00 00 C6 85 ?? ?? ?? ?? 00 B9 ?? ?? ?? ?? 33 C0 8D BD ?? ?? ?? ?? F3 AB");
 	if (uEHSvc_Loader_2) {
 		r.Patch(uEHSvc_Loader_2, L"31 C0 C2 18 00");
 	}
 
-	// 0x00BC91FC v186
+	// 0x00BC91FC v186.1
 	ULONG_PTR uHeartBeat = r.Scan(L"B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 81 EC ?? ?? ?? ?? 56 BE ?? ?? ?? ?? 56 8D 85 ?? ?? ?? ?? 6A 00 50 E8");
 	if (uHeartBeat) {
 		r.Patch(uHeartBeat, L"31 C0 C2 04 00");
 	}
 
-	// 0x00BC93BB v186
+	// 0x00BC93BB v186.1
 	ULONG_PTR uMKD25tray = r.Scan(L"55 8B EC 83 EC ?? 56 8B F1 57 8D 7E ?? 8B CF E8 ?? ?? ?? ?? 85 C0 0F 85");
 	if (uMKD25tray) {
 		r.Patch(uMKD25tray, L"31 C0 C3");
 	}
 
-	// 0x00BC938F v186
+	// 0x00BC938F v186.1
 	ULONG_PTR uAutoup = r.Scan(L"56 8D 71 ?? 8B CE E8 ?? ?? ?? ?? 85 C0 74 ?? 68 ?? ?? ?? ?? 68 ?? ?? ?? ?? FF 15");
 	if (uAutoup) {
 		r.Patch(uAutoup, L"31 C0 C3");
 	}
 
-	// 0x00BC92F6 v186
+	// 0x00BC92F6 v186.1
 	ULONG_PTR uASPLunchr = r.Scan(L"55 8B EC 83 EC ?? 56 8B F1 57 8D 7E ?? 8B CF E8 ?? ?? ?? ?? 85 C0 75 ?? 68 ?? ?? ?? ?? FF 15");
 	if (uASPLunchr) {
 		r.Patch(uASPLunchr, L"31 C0 C3");
 	}
 
-	// 0x00BC8A7A v186
+	// 0x00BC8A7A v186.1
 	ULONG_PTR uHSUpdate = r.Scan(L"B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 81 EC ?? ?? ?? ?? 56 83 C1 ?? 57 89 4D ?? E8 ?? ?? ?? ?? 85 C0 0F 85");
 	if (!uHSUpdate) {
 		// 0x00C10331 v187
@@ -166,23 +167,32 @@ bool MemoryPatch() {
 		r.Patch(uHSUpdate, L"31 C0 C3");
 	}
 
-	// 0x00B60EE5 v186
-	ULONG_PTR uWindowMode = r.Scan(L"C7 45 ?? 10 00 00 00 6A 03 FF 75 ?? 8D 4D ?? E8");
-	if (uWindowMode) {
-		r.Patch(uWindowMode, L"C7 45 DC 00 00 00 00");
-	}
-	else {
-		// 0x00BA70CF v187
-		uWindowMode = r.Scan(L"8B 45 ?? 89 45 ?? 6A 03 FF 75");
+	// 0x00B60EE5 v186.1
+	ULONG_PTR uWindowMode = 0;
+	if (bWindowMode) {
+		uWindowMode = r.Scan(L"C7 45 ?? 10 00 00 00 6A 03 FF 75 ?? 8D 4D ?? E8");
 		if (uWindowMode) {
-			r.Patch(uWindowMode, L"31 C0 90");
+			r.Patch(uWindowMode, L"C7 45 DC 00 00 00 00");
+		}
+		else {
+			// 0x00BA70CF v187
+			uWindowMode = r.Scan(L"8B 45 ?? 89 45 ?? 6A 03 FF 75");
+			if (uWindowMode) {
+				r.Patch(uWindowMode, L"31 C0 90");
+			}
 		}
 	}
 
-	// 0x0084268E v186
+	// 0x0084268E v186.1
 	ULONG_PTR uLauncher = r.Scan(L"55 8B EC 83 EC ?? 53 56 57 33 DB 53 FF 15 ?? ?? ?? ?? 8B 7D ?? 89 3D ?? ?? ?? ?? 8B 87 ?? ?? ?? ?? 6A");
 	if (uLauncher) {
 		r.Patch(uLauncher, L"B8 01 00 00 00 C3");
+	}
+
+	// 0x00425A17 v186.1
+	ULONG_PTR uAd = r.Scan(L"B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 EC ?? 53 56 57 33 DB 53 FF 15");
+	if (uAd) {
+		r.Patch(uAd, L"B8 01 00 00 00 C3");
 	}
 
 	DEBUG(L"uHackShield_Init = " + DWORDtoString(uHackShield_Init));
@@ -195,6 +205,16 @@ bool MemoryPatch() {
 	DEBUG(L"uHSUpdate = " + DWORDtoString(uHSUpdate));
 	DEBUG(L"uWindowMode = " + DWORDtoString(uWindowMode));
 	DEBUG(L"uLauncher = " + DWORDtoString(uLauncher));
+	DEBUG(L"uAd = " + DWORDtoString(uAd));
+
+	// v186.1
+	{
+		// アイテムドロップ不可マップ制限解除
+		r.Patch(0x00B75373, L"EB");
+		// ポイントアイテムドロップ制限解除
+		r.Patch(0x00531626, L"90 90 90 90 90 90");
+		r.Patch(0x00531638, L"90 90 90 90 90 90");
+	}
 
 	return true;
 }
@@ -223,17 +243,38 @@ HANDLE WINAPI CreateMutexExW_Hook(LPSECURITY_ATTRIBUTES lpMutexAttributes, LPCWS
 	return _CreateMutexExW(lpMutexAttributes, lpName, dwFlags, dwDesiredAccess);
 }
 
-DWORD dwPServer = 0x0100007F; // 127.0.0.1
+HHOOK (WINAPI *_SetWindowsHookExA)(int, HOOKPROC, HINSTANCE, DWORD) = NULL;
+HHOOK WINAPI SetWindowsHookExA_Hook(int idHook, HOOKPROC lpfn, HINSTANCE hmod, DWORD dwThreadId) {
+	return 0;
+}
+
+HHOOK(WINAPI *_SetWindowsHookExW)(int, HOOKPROC, HINSTANCE, DWORD) = NULL;
+HHOOK WINAPI SetWindowsHookExW_Hook(int idHook, HOOKPROC lpfn, HINSTANCE hmod, DWORD dwThreadId) {
+	return 0;
+}
+
+//DWORD dwPServer = 0x0200007F; // 127.0.0.1
+DWORD dwPServer = 0x86B27E99; // 153.126.178.134
+// 133.242.249.200
 int (PASCAL *_connect)(SOCKET, sockaddr_in *, int) = NULL;
 int PASCAL connect_Hook(SOCKET s, sockaddr_in *name, int namelen) {
 	WORD wPort = ntohs(name->sin_port);
+
 	std::wstring server = std::to_wstring(name->sin_addr.S_un.S_un_b.s_b1) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b2) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b3) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b4) + L":" + std::to_wstring(wPort);
 	
 	*(DWORD *)&name->sin_addr.S_un = dwPServer;
 
+	/*
+	if (wPort == 8484) {
+		wPort += 10000;
+	}
+	*/
+
 	std::wstring pserver = std::to_wstring(name->sin_addr.S_un.S_un_b.s_b1) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b2) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b3) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b4) + L":" + std::to_wstring(wPort);
 
 	DEBUG(L"[connect][" + server + L" -> " + pserver + L"]");
+
+	name->sin_port = htons(wPort);
 
 	return _connect(s, name, namelen);
 }
@@ -243,23 +284,49 @@ bool SetServerIP() {
 	if (fopen_s(&fp, "Emu.txt", "r")) {
 		return false;
 	}
-	BYTE *ip_bytes = (BYTE *)&dwPServer;
+	DWORD dwIP[4] = { 0 };
 
-	fscanf_s(fp, "%d.%d.%d.%d", &ip_bytes[0], &ip_bytes[1], &ip_bytes[2], &ip_bytes[3]);
+	fscanf_s(fp, "%d.%d.%d.%d", &dwIP[0], &dwIP[1], &dwIP[2], &dwIP[3]);
 	fclose(fp);
+
+	BYTE *ip_bytes = (BYTE *)&dwPServer;
+	for (int i = 0; i < 4; i++) {
+		ip_bytes[i] = (BYTE)dwIP[i];
+	}
+
+	return true;
+}
+
+bool SetWindowMode() {
+	FILE *fp = NULL;
+	if (fopen_s(&fp, "EmuWMode.txt", "r")) {
+		return false;
+	}
+
+	DWORD dwRead = 1;
+	fscanf_s(fp, "%d", &dwRead);
+
+	fclose(fp);
+
+	if (!dwRead) {
+		bWindowMode = false;
+	}
 
 	return true;
 }
 
 void RireSaba() {
 	EnterHook::Init();
-
+	//SetWindowMode();
 	SetServerIP();
 
 	// ip redirect
 	TestHook(connect);
 	// remove mutex and enable memory edit
 	TestHook(CreateMutexExW);
+	// test
+	TestHook(SetWindowsHookExA);
+	TestHook(SetWindowsHookExW);
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {

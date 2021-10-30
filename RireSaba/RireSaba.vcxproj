@@ -150,7 +150,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Memory.cpp" />
     <ClCompile Include="RireSaba.cpp" />
   </ItemGroup>
   <ItemGroup>

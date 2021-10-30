@@ -1,5 +1,23 @@
 #include"Injector.h"
 
+bool GetClientFileName(std::wstring &wFileName) {
+	FILE *fp = NULL;
+
+	wFileName = L"MapleStory.exe";
+	if (fopen_s(&fp, "RunEmu.txt", "r")) {
+		return false;
+	}
+	wchar_t buffer[MAX_PATH] = { 0 };
+	fwscanf_s(fp, L"%s", buffer);
+	fclose(fp);
+
+	if (wcslen(buffer)) {
+		wFileName = buffer;
+		return true;
+	}
+	return false;
+}
+
 bool Launcher() {
 	WCHAR wcDir[MAX_PATH] = { 0 };
 
@@ -16,7 +34,10 @@ bool Launcher() {
 
 	dir = dir.substr(0, pos + 1);
 
-	Injector injector(dir + L"MapleStory.exe", dir + L"Emu.dll");
+	std::wstring wFileName;
+	GetClientFileName(wFileName);
+
+	Injector injector(dir + wFileName, dir + L"Emu.dll");
 	return injector.Run();
 }
 

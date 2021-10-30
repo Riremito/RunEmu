@@ -121,6 +121,14 @@ void Redirection(DWORD &dwEIP) {
 		dwEIP = (dwEIP + 0x06) + *(signed long int *)(dwEIP + 0x07) + 0x05;
 		return Redirection(dwEIP);
 	}
+	if (memcmp((void *)dwEIP, "\xEB", 1) == 0) {
+		dwEIP += *(char *)(dwEIP + 0x01) + 0x02;
+		return Redirection(dwEIP);
+	}
+	if (memcmp((void *)dwEIP, "\xE9", 1) == 0) {
+		dwEIP += *(signed long int *)(dwEIP + 0x01) + 0x05;
+		return Redirection(dwEIP);
+	}
 }
 
 DWORD Decode(DWORD dwStartAddress) {
