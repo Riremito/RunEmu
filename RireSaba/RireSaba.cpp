@@ -67,6 +67,7 @@ DWORD __stdcall GetBackup(DWORD dwAddress) {
 	return dwAddress;
 }
 
+// v186.1
 void __declspec(naked) CRCBypass() {
 	__asm {
 		mov ecx, [ecx]
@@ -96,6 +97,31 @@ void __declspec(naked) CRCBypass() {
 	}
 }
 
+// 00A2A60D - 0FB6 09  - movzx ecx, byte ptr[ecx]
+// 00A2A610 - 8B 55 14 - mov edx, [ebp + 14]
+void __declspec(naked) CRCBypass180() {
+	__asm {
+		push eax
+		push edx
+		push ecx
+		push ebx
+		push esi
+		push edi
+		push ecx // Address
+		call GetBackup
+		// eax = new address
+		pop edi
+		pop esi
+		pop ebx
+		pop ecx
+		pop edx
+		movzx ecx, byte ptr[eax] // crc bypass
+		pop eax
+		mov edx, [ebp + 0x14]
+		jmp uMSCRC_Ret
+	}
+}
+
 bool bWindowMode = true;
 bool MemoryPatch() {
 	Rosemary r;
@@ -105,12 +131,20 @@ bool MemoryPatch() {
 		DEBUG(L"vSection = " + DWORDtoString((ULONG_PTR)vSection[i].BaseAddress) + L" - " + DWORDtoString((ULONG_PTR)vSection[i].BaseAddress + vSection[i].RegionSize) + L", Backup = " + DWORDtoString((ULONG_PTR)vBackup[i]));
 	}
 
-	// 0x00B5D2B0 v186.1
-	ULONG_PTR uMSCRC = r.Scan(L"8B 4D 18 8B 55 E0 8B 75 08 8B 09 33 0C 96 81 E1 FF 00 00 00 33 04 8D");
+	// 0x00A2A60D v180.1
+	ULONG_PTR uMSCRC = r.Scan(L"0F B6 09 8B 55 14 8B 12 33 D1 81 E2 FF 00 00 00 33 04 95");
 	if (uMSCRC) {
-		uMSCRC += 0x09;
-		uMSCRC_Ret = uMSCRC + 0x05;
-		r.Hook(uMSCRC, CRCBypass);
+		uMSCRC_Ret = uMSCRC + 0x06;
+		r.Hook(uMSCRC, CRCBypass180, 1);
+	}
+	if (!uMSCRC) {
+		// 0x00B5D2B0 v186.1
+		uMSCRC = r.Scan(L"8B 4D 18 8B 55 E0 8B 75 08 8B 09 33 0C 96 81 E1 FF 00 00 00 33 04 8D");
+		if (uMSCRC) {
+			uMSCRC += 0x09;
+			uMSCRC_Ret = uMSCRC + 0x05;
+			r.Hook(uMSCRC, CRCBypass);
+		}
 	}
 	DEBUG(L"uMSCRC = " + DWORDtoString(uMSCRC));
 
@@ -157,12 +191,17 @@ bool MemoryPatch() {
 		r.Patch(uASPLunchr, L"31 C0 C3");
 	}
 
-	// 0x00BC8A7A v186.1
-	ULONG_PTR uHSUpdate = r.Scan(L"B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 81 EC ?? ?? ?? ?? 56 83 C1 ?? 57 89 4D ?? E8 ?? ?? ?? ?? 85 C0 0F 85");
+	// 0x00A87C23 // v180.1
+	ULONG_PTR uHSUpdate = r.Scan(L"55 8B EC 81 EC ?? ?? ?? ?? 53 56 8D 59 ?? 57 8B CB E8 ?? ?? ?? ?? 85 C0 0F 85 ?? ?? ?? ?? 8A 15");
 	if (!uHSUpdate) {
-		// 0x00C10331 v187
-		uHSUpdate = r.Scan(L"B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 81 EC ?? ?? ?? ?? 53 56 83 C1 ?? 57 89 4D ?? E8 ?? ?? ?? ?? 85 C0 0F 85");
+		// 0x00BC8A7A v186.1
+		uHSUpdate = r.Scan(L"B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 81 EC ?? ?? ?? ?? 56 83 C1 ?? 57 89 4D ?? E8 ?? ?? ?? ?? 85 C0 0F 85");
+		if (!uHSUpdate) {
+			// 0x00C10331 v187
+			uHSUpdate = r.Scan(L"B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 81 EC ?? ?? ?? ?? 53 56 83 C1 ?? 57 89 4D ?? E8 ?? ?? ?? ?? 85 C0 0F 85");
+		}
 	}
+
 	if (uHSUpdate) {
 		r.Patch(uHSUpdate, L"31 C0 C3");
 	}
@@ -207,6 +246,7 @@ bool MemoryPatch() {
 	DEBUG(L"uLauncher = " + DWORDtoString(uLauncher));
 	DEBUG(L"uAd = " + DWORDtoString(uAd));
 
+	/*
 	// v186.1
 	{
 		// アイテムドロップ不可マップ制限解除
@@ -215,6 +255,7 @@ bool MemoryPatch() {
 		r.Patch(0x00531626, L"90 90 90 90 90 90");
 		r.Patch(0x00531638, L"90 90 90 90 90 90");
 	}
+	*/
 
 	return true;
 }
@@ -253,9 +294,7 @@ HHOOK WINAPI SetWindowsHookExW_Hook(int idHook, HOOKPROC lpfn, HINSTANCE hmod, D
 	return 0;
 }
 
-//DWORD dwPServer = 0x0200007F; // 127.0.0.1
-DWORD dwPServer = 0x86B27E99; // 153.126.178.134
-// 133.242.249.200
+DWORD dwPServer = 0x0100007F; // 127.0.0.1
 int (PASCAL *_connect)(SOCKET, sockaddr_in *, int) = NULL;
 int PASCAL connect_Hook(SOCKET s, sockaddr_in *name, int namelen) {
 	WORD wPort = ntohs(name->sin_port);
@@ -263,12 +302,6 @@ int PASCAL connect_Hook(SOCKET s, sockaddr_in *name, int namelen) {
 	std::wstring server = std::to_wstring(name->sin_addr.S_un.S_un_b.s_b1) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b2) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b3) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b4) + L":" + std::to_wstring(wPort);
 	
 	*(DWORD *)&name->sin_addr.S_un = dwPServer;
-
-	/*
-	if (wPort == 8484) {
-		wPort += 10000;
-	}
-	*/
 
 	std::wstring pserver = std::to_wstring(name->sin_addr.S_un.S_un_b.s_b1) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b2) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b3) + L"." + std::to_wstring(name->sin_addr.S_un.S_un_b.s_b4) + L":" + std::to_wstring(wPort);
 
@@ -279,9 +312,10 @@ int PASCAL connect_Hook(SOCKET s, sockaddr_in *name, int namelen) {
 	return _connect(s, name, namelen);
 }
 
+// 接続先のサーバーのIPを変更したい場合の設定
 bool SetServerIP() {
 	FILE *fp = NULL;
-	if (fopen_s(&fp, "Emu.txt", "r")) {
+	if (fopen_s(&fp, "SetServer.txt", "r")) {
 		return false;
 	}
 	DWORD dwIP[4] = { 0 };
@@ -297,9 +331,10 @@ bool SetServerIP() {
 	return true;
 }
 
+// ウィンドウモード無効にしたい場合の設定
 bool SetWindowMode() {
 	FILE *fp = NULL;
-	if (fopen_s(&fp, "EmuWMode.txt", "r")) {
+	if (fopen_s(&fp, "SetWindow.txt", "r")) {
 		return false;
 	}
 
@@ -317,7 +352,7 @@ bool SetWindowMode() {
 
 void RireSaba() {
 	EnterHook::Init();
-	//SetWindowMode();
+	SetWindowMode();
 	SetServerIP();
 
 	// ip redirect

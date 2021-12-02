@@ -1,4 +1,30 @@
 # RunEmu
+## 動作確認
++ v186.1
++ v185.0
++ v184.0
++ v180.1
++ v187.0
+
+## 設定
+```
+* RunEmu.txt
+RunEmu.exeを実行したときに実行するMapleStory.exeのファイル名を記載する
+
+* SetWindow.txt (なくてもOK)
+0と記載するとウィンドウモードが無効になる
+
+* SetServer.txt (なくてもOK)
+接続先のサーバーのIPを記載する (デフォルトは127.0.0.1)
+
+* Emu.dll
+RunEmu.exeからMapleStory.exeにInjectされます
+HackShield, MSCRCが無効が無効になり、接続先のサーバーのIPが指定したものに切り替わります
+```
+
+## 使い方
++ ゲームフォルダに設定ファイルに設定を書き込みRunEmu.txtを実行
+
 ## Emu.dll
 + 本体
 + themidaとかでpackされたメモリが展開されるタイミングでメモリを書き換えます
@@ -16,10 +42,6 @@
 ## RunEmu.exe
 + DLL Injector
 + 多重起動制限とランチャーはランチャーが既に起動してから無効化は難しいので起動前にDLLをInjectします
-
-## Emu.txt
-+ 接続先のサーバーのIPを記載します
-+ ファイルがないと127.0.0.1に自動的に設定されます
 
 ## その他
 + 基本的に必要なデバッグ出力はOutputDebugStringで出力しているのでDebugViewとか利用すれば確認出来ます
