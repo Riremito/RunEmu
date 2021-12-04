@@ -150,9 +150,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FixThemida.cpp" />
     <ClCompile Include="RireSaba.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FixThemida.h" />
     <ClInclude Include="Memory.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
