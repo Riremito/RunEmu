@@ -131,6 +131,20 @@ void __declspec(naked) CRCBypass180() {
 	}
 }
 
+std::wstring DatatoString(BYTE *b, DWORD Length) {
+	std::wstring wdata;
+
+	for (DWORD i = 0; i < Length; i++) {
+		if (i) {
+			wdata.push_back(L' ');
+		}
+		wdata += BYTEtoString(b[i]);
+	}
+
+	return wdata;
+}
+
+
 bool bWindowMode = true;
 bool MemoryPatch() {
 	Rosemary r;
@@ -285,7 +299,7 @@ bool MemoryPatch() {
 	if (uAd) {
 		r.Patch(uAd, L"B8 01 00 00 00 C3");
 	}
-
+	
 	DEBUG(L"uHackShield_Init = " + DWORDtoString(uHackShield_Init));
 	DEBUG(L"uEHSvc_Loader_1  = " + DWORDtoString(uEHSvc_Loader_1));
 	DEBUG(L"uEHSvc_Loader_2 = " + DWORDtoString(uEHSvc_Loader_2));
