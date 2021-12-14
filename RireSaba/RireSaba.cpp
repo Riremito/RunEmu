@@ -131,6 +131,32 @@ void __declspec(naked) CRCBypass180() {
 	}
 }
 
+// 0098A486 - 0FB6 3C 1F - movzx edi, byte ptr[edi + ebx]
+// 0098A48A - 8B DA - mov ebx, edx
+void __declspec(naked) CRCBypass176() {
+	__asm {
+		push eax
+		push edx
+		push ecx
+		push ebx
+		push esi
+		push edi
+		add ebx,edi
+		push ebx
+		call GetBackup
+		// eax = new address
+		pop edi
+		pop esi
+		pop ebx
+		pop ecx
+		pop edx
+		movzx edi, byte ptr[eax] // crc bypass
+		pop eax
+		mov ebx, edx
+		jmp uMSCRC_Ret
+	}
+}
+
 std::wstring DatatoString(BYTE *b, DWORD Length) {
 	std::wstring wdata;
 
@@ -154,11 +180,19 @@ bool MemoryPatch() {
 		DEBUG(L"vSection = " + DWORDtoString((ULONG_PTR)vSection[i].BaseAddress) + L" - " + DWORDtoString((ULONG_PTR)vSection[i].BaseAddress + vSection[i].RegionSize) + L", Backup = " + DWORDtoString((ULONG_PTR)vBackup[i]));
 	}
 
-	// 0x00A2A60D v180.1
-	ULONG_PTR uMSCRC = r.Scan(L"0F B6 09 8B 55 14 8B 12 33 D1 81 E2 FF 00 00 00 33 04 95");
+	// 0x0098A486 v176.0
+	ULONG_PTR uMSCRC = r.Scan(L"0F B6 3C 1F 8B DA 23 DE 33 FB 8B 3C BD");
 	if (uMSCRC) {
 		uMSCRC_Ret = uMSCRC + 0x06;
-		r.Hook(uMSCRC, CRCBypass180, 1);
+		r.Hook(uMSCRC, CRCBypass176, 1);
+	}
+	// 0x00A2A60D v180.1
+	if (!uMSCRC) {
+		uMSCRC = r.Scan(L"0F B6 09 8B 55 14 8B 12 33 D1 81 E2 FF 00 00 00 33 04 95");
+		if (uMSCRC) {
+			uMSCRC_Ret = uMSCRC + 0x06;
+			r.Hook(uMSCRC, CRCBypass180, 1);
+		}
 	}
 	if (!uMSCRC) {
 		// 0x00B5D2B0 v186.1
@@ -215,6 +249,10 @@ bool MemoryPatch() {
 		uMKD25tray = r.Scan(L"55 8B EC 83 EC 0C 56 8B F1 83 7E 18 00 0F 85 ?? ?? ?? ?? 83 65 FC 00 8D 45 FC 50 E8 ?? ?? ?? ?? 90 83 7D FC 00 59");
 	}
 	if (!uMKD25tray) {
+		// 0x009DF88A v176.0
+		uMKD25tray = r.Scan(L"55 8B EC 83 EC 0C 56 8B F1 83 7E 18 00 0F 85 ?? ?? ?? ?? 83 65 FC 00 8D 45 FC 50 FF 15");
+	}
+	if (!uMKD25tray) {
 		// 0x00BC93BB v186.1
 		uMKD25tray = r.Scan(L"55 8B EC 83 EC ?? 56 8B F1 57 8D 7E ?? 8B CF E8 ?? ?? ?? ?? 85 C0 0F 85");
 	}
@@ -229,6 +267,10 @@ bool MemoryPatch() {
 		uAutoup = r.Scan(L"56 8B F1 83 7E 14 00 74 16 68 ?? ?? ?? ?? 68 80 00 00 00 E8 ?? ?? ?? ?? 90 83 66 14 00 59 59 5E C3");
 	}
 	if (!uAutoup) {
+		// 0x009DF869 v176.0
+		uAutoup = r.Scan(L"56 8B F1 83 7E 14 00 74 ?? 68 ?? ?? ?? ?? 68 80 00 00 00 FF 15");
+	}
+	if (!uAutoup) {
 		// 0x00BC938F v186.1
 		uAutoup = r.Scan(L"56 8D 71 ?? 8B CE E8 ?? ?? ?? ?? 85 C0 74 ?? 68 ?? ?? ?? ?? 68 ?? ?? ?? ?? FF 15");
 	}
@@ -241,6 +283,10 @@ bool MemoryPatch() {
 	if (!uASPLunchr) {
 		// v164.0 call nop
 		uASPLunchr = r.Scan(L"55 8B EC 83 EC 0C 56 8B F1 83 7E 14 00 75 ?? 68 ?? ?? ?? ?? E8 ?? ?? ?? ?? 90");
+	}
+	if (!uASPLunchr) {
+		// 0x009DF7DC v176.0
+		uASPLunchr = r.Scan(L"55 8B EC 83 EC 0C 56 8B F1 83 7E 14 00 75 ?? 68 ?? ?? ?? ?? FF 15");
 	}
 	if (!uASPLunchr) {
 		// 0x00BC92F6 v186.1
@@ -322,6 +368,9 @@ bool MemoryPatch() {
 		r.Patch(0x00531638, L"90 90 90 90 90 90");
 	}
 	*/
+
+	//SetDllDirectoryW(L"C:\\Users\\elfenlied\\Desktop\\Elfenlied\\Software\\Cheat Engine 7.3");
+	//LoadLibraryW(L"Packet.dll");
 
 	return true;
 }
