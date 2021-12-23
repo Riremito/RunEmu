@@ -30,7 +30,8 @@ enum SubControl {
 	LISTVIEW_LOGGER,
 	EDIT_EXTRA,
 	CHECK_LOG,
-	BUTTON_CLEAR
+	BUTTON_CLEAR,
+	BUTTON_EXPORT
 };
 
 
@@ -54,6 +55,125 @@ typedef struct {
 
 std::vector<PacketData> packet_data_out;
 std::vector<PacketData> packet_data_in;
+
+
+std::wstring GetExtraInfo(PacketData &pd);
+
+// UTF16 to SJIS
+bool ShiftJIStoUTF8(std::wstring utf16, std::string &sjis) {
+	// UTF16へ変換する際の必要なバイト数を取得
+	int len = WideCharToMultiByte(CP_ACP, 0, utf16.c_str(), -1, 0, 0, 0, 0);
+	if (!len) {
+		return false;
+	}
+
+	std::vector<BYTE> b(len + 1);
+
+	if (!WideCharToMultiByte(CP_ACP, 0, utf16.c_str(), -1, (char *)&b[0], len, 0, 0)) {
+		return false;
+	}
+
+	sjis = std::string((char *)&b[0]);
+	return true;
+}
+
+bool ExportPacket() {
+	SYSTEMTIME st = { 0 };
+	GetLocalTime(&st);
+
+	std::wstring wDir = L"plog";
+	WCHAR date[256] = { 0 };
+	swprintf_s(date, L"%04d%02d%02d_%02d%02d%02d", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+	std::wstring wOutFile = wDir + L"/";
+	wOutFile += date;
+	wOutFile += L"_export_out.txt";
+	std::wstring wInFile = wDir + L"/";
+	wInFile += date;
+	wInFile += L"_export_in.txt";
+	std::string newline = "===================\r\n";
+
+	CreateDirectoryW(wDir.c_str(), NULL);
+
+	/*
+	HANDLE hFile = CreateFileW(wOutFile.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+	DWORD wb = 0;
+
+	if (hFile != INVALID_HANDLE_VALUE) {
+		for (size_t i = 0; i < packet_data_out.size(); i++) {
+			DEBUG(L"EX...");
+			std::wstring wText = GetExtraInfo(packet_data_out[i]);
+			DEBUG(L"wru...");
+			WriteFile(hFile, newline.c_str(), newline.length(), &wb, NULL);
+			std::string text;
+			DEBUG(L"testing...");
+			if (!ShiftJIStoUTF8(wText, text)) {
+				text = "ERROR";
+			}
+			DEBUG(L"OK");
+			if (text.length()) {
+				WriteFile(hFile, text.c_str(), text.length(), &wb, NULL);
+			}
+		}
+		CloseHandle(hFile);
+	}
+	*/
+
+	FILE *fp = NULL;
+	_wfopen_s(&fp, wOutFile.c_str(), L"wb");
+
+	if (fp) {
+		for (size_t i = 0; i < packet_data_out.size(); i++) {
+			std::wstring wText = GetExtraInfo(packet_data_out[i]);
+			fwrite(newline.c_str(), 1, newline.length(), fp);
+			std::string text;
+			if (!ShiftJIStoUTF8(wText, text)) {
+				text = "ERROR";
+			}
+			if (text.length()) {
+				fwrite(text.c_str(), 1, text.length(), fp);
+			}
+		}
+		fclose(fp);
+	}
+
+	fp = NULL;
+	_wfopen_s(&fp, wInFile.c_str(), L"wb");
+	if (fp) {
+		for (size_t i = 0; i < packet_data_in.size(); i++) {
+			std::wstring wText = GetExtraInfo(packet_data_in[i]);
+			fwrite(newline.c_str(), 1, newline.length(), fp);
+			std::string text;
+			if (!ShiftJIStoUTF8(wText, text)) {
+				text = "ERROR";
+			}
+			fwrite(text.c_str(), 1, text.length(), fp);
+		}
+		fclose(fp);
+	}
+
+	return true;
+}
+
+// ログインパケットのパスワードを消す
+bool RemovePassword(PacketData &pd) {
+	if (pd.packet.size() < 2) {
+		return false;
+	}
+
+	if (*(WORD *)&pd.packet[0] != 0x0001) {
+		return false;
+	}
+
+	for (size_t i = 0; i < pd.format.size(); i++) {
+		if (pd.format[i].type == ENCODESTR) {
+			for (size_t j = 0; j < *(WORD *)&pd.packet[pd.format[i].pos]; j++) {
+				*(BYTE *)&pd.packet[pd.format[i].pos + 2 + j] = '*';
+			}
+		}
+	}
+
+	return true;
+}
 
 
 bool AddFormat(PacketData &pd, PacketEditorMessage &pem) {
@@ -92,6 +212,9 @@ bool AddFormat(PacketData &pd, PacketEditorMessage &pem) {
 			else {
 				pd.status = 1;
 			}
+
+			// ログインパケットのパスワードを消す
+			RemovePassword(pd);
 		}
 		return true;
 	}
@@ -120,6 +243,8 @@ bool AddFormat(PacketData &pd, PacketEditorMessage &pem) {
 		unk.addr = 0;
 		pd.format.push_back(unk);
 		pd.status = -1;
+		pd.used += unk.size;
+		return false;
 	}
 
 	// フォーマットを登録
@@ -245,6 +370,7 @@ bool OnCreate(Alice &a) {
 	a.ReadOnly(EDIT_EXTRA);
 	a.CheckBox(CHECK_LOG, L"Logging", 700, 310, BST_CHECKED);
 	a.Button(BUTTON_CLEAR, L"Clear", 600, 310);
+	a.Button(BUTTON_EXPORT, L"Export", 500, 310);
 
 	Server(a);
 	return true;
@@ -256,6 +382,13 @@ bool OnCommand(Alice &a, int nIDDlgItem) {
 		a.ListView_Clear(LISTVIEW_LOGGER);
 		packet_data_out.clear();
 		packet_data_in.clear();
+		return true;
+	}
+
+	if (nIDDlgItem == BUTTON_EXPORT) {
+		ExportPacket();
+		a.SetText(EDIT_EXTRA, L"Exported!");
+		return true;
 	}
 	return true;
 }
@@ -429,12 +562,22 @@ std::wstring GetExtraInfo(PacketData &pd) {
 
 	wText += L"ret = " + DWORDtoString(pd.addr) + L"\r\n";
 	wText += L"length = " + std::to_wstring((int)pd.packet.size()) + L"\r\n";
-	wText += DatatoString(&pd.packet[0], pd.packet.size(), true) + L"\r\n";
+	if (pd.packet.size()) {
+		wText += DatatoString(&pd.packet[0], pd.packet.size(), true) + L"\r\n";
+	}
+	else {
+		wText += L"ERROR";
+	}
 	wText += L"\r\n";
 
 	wText += L"[Format]\r\n";
-	for (size_t i = 0; i < pd.format.size(); i++) {
-		wText += GetFormat(pd, pd.format[i]) + L"\r\n";
+	if (pd.packet.size() >= 2) {
+		for (size_t i = 0; i < pd.format.size(); i++) {
+			wText += GetFormat(pd, pd.format[i]) + L"\r\n";
+		}
+	}
+	else {
+		wText += L"ERROR\r\n";
 	}
 
 	return wText;
